@@ -1084,5 +1084,6 @@ init_fail:
         vr_free(rtable->algo_data);
         rtable->algo_data = NULL;
     }
+
     return ret;
 }
