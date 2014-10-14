@@ -69,6 +69,8 @@
 #define VP_FLAG_GRO             (1 << 6)
 /* Attempt to do segmentation on inner packet */
 #define VP_FLAG_GSO             (1 << 7)
+/* Diagnostic packet */
+#define VP_FLAG_DIAG            (1 << 8)
 
 /* 
  * possible 256 values of what a packet can be. currently, this value is
@@ -265,7 +267,7 @@ struct vr_vlan_hdr {
 #define VR_ETH_PROTO_IP6        0x86DD
 #define VR_ETH_PROTO_VLAN       0x8100
 
-#define VR_DIAG_IP_CSUM         0xffff
+#define VR_DIAG_CSUM         0xffff
 
 struct vr_arp {
     unsigned short arp_hw;
@@ -399,6 +401,21 @@ vr_pkt_is_ip(struct vr_packet *pkt)
         return true;
 
     return false;
+}
+
+static inline bool
+vr_pkt_is_diag(struct vr_packet *pkt)
+{
+    if (pkt->vp_flags & VP_FLAG_DIAG)
+        return true;
+    return false;
+}
+
+static inline void
+vr_pkt_set_diag(struct vr_packet *pkt)
+{
+    pkt->vp_flags |= VP_FLAG_DIAG;
+    return;
 }
 
 static inline bool

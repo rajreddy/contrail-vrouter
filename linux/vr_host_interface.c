@@ -920,6 +920,7 @@ linux_get_packet(struct sk_buff *skb, struct vr_interface *vif)
     if (skb->ip_summed == CHECKSUM_PARTIAL)
         pkt->vp_flags |= VP_FLAG_CSUM_PARTIAL;
 
+    pkt->vp_ttl = 64;
     pkt->vp_type = VP_TYPE_NULL;
 
     return pkt;
