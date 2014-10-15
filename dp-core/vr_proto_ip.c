@@ -300,8 +300,12 @@ vr_icmp_input(struct vrouter *router, struct vr_packet *pkt,
             if (ntohs(udph->udp_dport) != VR_MPLS_OVER_UDP_DST_PORT)
 =======
             udph = (struct vr_udp *)(pkt_data(pkt) + offset);
+<<<<<<< HEAD
             if (ntohs(udph->udp_sport) != VR_MPLS_OVER_UDP_DST_PORT)
 >>>>>>>     vrouter changes to support ping and traceroute diagnostics
+=======
+            if (ntohs(udph->udp_dport) != VR_MPLS_OVER_UDP_DST_PORT)
+>>>>>>> fix typo : use dport instead of sport
                 return unhandled;
         }
 
