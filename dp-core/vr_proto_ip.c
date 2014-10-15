@@ -148,6 +148,11 @@ vr_forward(struct vrouter *router, unsigned short vrf,
         pkt->vp_type = VP_TYPE_IP6;
     } else {
         family = AF_INET;
+        if (!ip->ip_ttl) {
+            vr_pfree(pkt, VP_DROP_TTL_EXCEEDED);
+            return 0;
+        }
+
         ttl = vr_ip_decrement_ttl(ip);
         pkt->vp_type = VP_TYPE_IP;
     }
@@ -273,11 +278,16 @@ vr_icmp_input(struct vrouter *router, struct vr_packet *pkt,
 
         iph = (struct vr_ip *)(pkt_data(pkt) + offset);
         if (iph->ip_proto == VR_IP_PROTO_UDP) {
-            pull_len += sizeof(struct vr_udp);
+            /* for sport and dport */
+            pull_len += 4;
             offset += (iph->ip_hl * 4);
             ret = vr_pkt_may_pull(pkt, pull_len);
             if (ret)
                 return unhandled;
+            /*
+             * Note - we can't look at any other data other than ports
+             * since we pull only the first 4 bytes
+             */
             udph = (struct vr_udp *)(pkt_data(pkt) + offset);
             if (ntohs(udph->udp_dport) != VR_MPLS_OVER_UDP_DST_PORT)
                 return unhandled;
