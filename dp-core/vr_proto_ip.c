@@ -279,7 +279,7 @@ vr_icmp_input(struct vrouter *router, struct vr_packet *pkt,
             if (ret)
                 return unhandled;
             udph = (struct vr_udp *)(pkt_data(pkt) + offset);
-            if (ntohs(udph->udp_sport) != VR_MPLS_OVER_UDP_DST_PORT)
+            if (ntohs(udph->udp_dport) != VR_MPLS_OVER_UDP_DST_PORT)
                 return unhandled;
         }
 
