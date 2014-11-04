@@ -234,6 +234,7 @@ lh_preset(struct vr_packet *pkt)
     return;
 }
 
+
 static void
 lh_pset_data(struct vr_packet *pkt, unsigned short offset)
 {
@@ -244,8 +245,7 @@ lh_pset_data(struct vr_packet *pkt, unsigned short offset)
     skb->data = pkt->vp_head + offset;
     skb_head_len = skb_tail_pointer(skb) - skb->data;
     skb->len = skb_head_len + skb->data_len;
-
-    return;
+     return;
 }
 
 static unsigned int
@@ -778,7 +778,7 @@ static int
 lh_pkt_from_vm_tcp_mss_adj(struct vr_packet *pkt, unsigned short overlay_len)
 {
     struct sk_buff *skb = vp_os_packet(pkt);
-    int hlen, pull_len, proto;
+    int hlen, pull_len, proto, opt_len = 0;
     struct vr_ip *iph;
     struct vr_ip6 *ip6h;
     struct tcphdr *tcph;
@@ -791,10 +791,17 @@ lh_pkt_from_vm_tcp_mss_adj(struct vr_packet *pkt, unsigned short overlay_len)
 
     pull_len = pkt->vp_data - (skb_headroom(skb));
 
+    /* Pull in ipv4 header-length */
+    pull_len += sizeof(struct vr_ip);
+
     if (vr_ip_is_ip6(iph)) {
 
-        ip6h = (struct vr_ip6 *)iph;
-        pull_len += sizeof(struct vr_ip6);
+        pull_len += (sizeof(struct vr_ip6) - sizeof(struct vr_ip));
+        if (!pskb_may_pull(skb, pull_len)) {
+            return VP_DROP_PULL;
+        }
+
+        ip6h = (struct vr_ip6 *) (skb->head + pkt->vp_data);
         proto = ip6h->ip6_nxt;
         hlen = sizeof(struct vr_ip6);
     } else {
@@ -805,20 +812,16 @@ lh_pkt_from_vm_tcp_mss_adj(struct vr_packet *pkt, unsigned short overlay_len)
             goto out;
         }
 
-        pull_len += sizeof(struct vr_ip);
         proto = iph->ip_proto;
         hlen = iph->ip_hl * 4;
-    }
-
-    if (!pskb_may_pull(skb, pull_len)) {
-        return VP_DROP_PULL; 
+        opt_len = hlen - sizeof(struct vr_ip);
     }
 
     if (proto != VR_IP_PROTO_TCP) {
         goto out;
     }
 
-    pull_len += sizeof(struct tcphdr);
+    pull_len += sizeof(struct tcphdr) + opt_len;
 
     if (!pskb_may_pull(skb, pull_len)) {
         return VP_DROP_PULL;
@@ -838,6 +841,9 @@ lh_pkt_from_vm_tcp_mss_adj(struct vr_packet *pkt, unsigned short overlay_len)
     if (!pskb_may_pull(skb, pull_len)) {
         return VP_DROP_PULL;
     }
+
+    iph = (struct vr_ip *) (skb->head + pkt->vp_data);
+    tcph = (struct tcphdr *) ((char *) iph +  hlen);
 
     lh_adjust_tcp_mss(tcph, skb, overlay_len, hlen);
 
@@ -2057,26 +2063,18 @@ lh_pull_inner_headers(struct vr_packet *pkt,
                      lh_adjust_tcp_mss(tcph, skb, vrouter_overlay_len, sizeof(struct vr_ip));
                  }
              } else {
-                 if (!vr_ip_fragment(iph)) {
-                     if (iph->ip_proto == VR_IP_PROTO_TCP)  {
-                         lh_handle_checksum_complete_skb(skb);
-                         tcpoff = (char *)tcph - (char *) skb->data;
+                 if ((iph->ip_proto == VR_IP_PROTO_TCP) && 
+                        (!vr_ip_fragment(iph))) { 
+                     lh_handle_checksum_complete_skb(skb);
+                     tcpoff = (char *)tcph - (char *) skb->data;
 
-                         skb_pull(skb, tcpoff);
-                         if (lh_csum_verify(skb, iph)) {
-                             if (th_csum == VR_DIAG_CSUM) {
-                                 vr_pkt_set_diag(pkt);
-                             } else {
-                                 goto cksum_err;
-                             }
-                         }
-
-                         skb_push(skb, tcpoff);
-                         if (vr_to_vm_mss_adj) {
-                             lh_adjust_tcp_mss(tcph, skb, vrouter_overlay_len, sizeof(struct vr_ip));
-                         }
-                     } else if (th_csum == VR_DIAG_CSUM) {
-                         vr_pkt_set_diag(pkt);
+                     skb_pull(skb, tcpoff);
+                     if (lh_csum_verify(skb, iph)) {
+                         goto cksum_err;
+                     }
+                     skb_push(skb, tcpoff);
+                     if (vr_to_vm_mss_adj) {
+                         lh_adjust_tcp_mss(tcph, skb, vrouter_overlay_len, sizeof(struct vr_ip));
                      }
                  }
              }

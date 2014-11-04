@@ -130,8 +130,7 @@ vr_forward(struct vrouter *router, unsigned short vrf,
     struct vr_icmp *icmph;
     struct vr_forwarding_md rt_fmd;
     struct vr_interface *vif;
-    int family, status, encap_len = 0;
-    unsigned char ttl;
+    int family = AF_INET, status, encap_len = 0;
     short plen;
     uint32_t rt_prefix[4];
 
@@ -143,22 +142,11 @@ vr_forward(struct vrouter *router, unsigned short vrf,
     if (vr_ip_is_ip6(ip)) {
         family = AF_INET6;
         ip6 = (struct vr_ip6 *)pkt_data(pkt);
-        /* ttl = --ip6->ip6_hlim */
-        ttl = ip6->ip6_hlim;
         pkt->vp_type = VP_TYPE_IP6;
     } else {
-        family = AF_INET;
-        if (!ip->ip_ttl) {
-            vr_pfree(pkt, VP_DROP_TTL_EXCEEDED);
-            return 0;
-        }
-
-        ttl = vr_ip_decrement_ttl(ip);
         pkt->vp_type = VP_TYPE_IP;
     }
  
-    pkt->vp_ttl = ttl;
-
     rt.rtr_req.rtr_vrf_id = vrf;
     rt.rtr_req.rtr_family = family;
     if (family == AF_INET) {
@@ -569,7 +557,6 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
         } else {
             vr_preset(pkt);
         }
-
         ret = vif->vif_tx(vif, pkt);
     }
 
@@ -743,6 +730,7 @@ vr_myip(struct vr_interface *vif, unsigned int ip)
         return 1;
 
 
+    rt.rtr_req.rtr_family = AF_INET;
     rt.rtr_req.rtr_vrf_id = vif->vif_vrf;
     rt.rtr_req.rtr_prefix = (uint8_t*)&rt_prefix;
 
@@ -759,3 +747,24 @@ vr_myip(struct vr_interface *vif, unsigned int ip)
 
     return 1;
 }
+
+
+unsigned int
+vr_inet_route_flags(unsigned int vrf, unsigned int ip)
+{
+    struct vr_route_req rt;
+    uint32_t rt_prefix;
+
+    memset(&rt, 0 , sizeof(rt));
+    rt.rtr_req.rtr_family = AF_INET;
+    rt.rtr_req.rtr_vrf_id = vrf;
+    rt.rtr_req.rtr_prefix = (uint8_t*)&rt_prefix;
+    *(uint32_t*)rt.rtr_req.rtr_prefix = (ip);
+    rt.rtr_req.rtr_prefix_size = 4;
+    rt.rtr_req.rtr_prefix_len = IP4_PREFIX_LEN;
+
+    (void)vr_inet_route_lookup(vrf, &rt, NULL);
+
+    return rt.rtr_req.rtr_label_flags;
+}
+

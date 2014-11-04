@@ -55,6 +55,9 @@
 #define VIF_FLAG_DHCP_ENABLED       0x100
 /* The physical interface corresponds to a vhost interface */
 #define VIF_FLAG_VHOST_PHYS         0x200
+#define VIF_FLAG_PROMISCOUS         0x400
+/* untagged packets should be treated as packets with tag 0 */
+#define VIF_FLAG_NATIVE_VLAN_TAG    0x800
 
 
 #define VIF_VRF_TABLE_ENTRIES       1024
@@ -203,7 +206,7 @@ extern int vif_vrf_table_get(struct vr_interface *, vr_vrf_assign_req *);
 extern unsigned int vif_vrf_table_get_nh(struct vr_interface *, unsigned short);
 extern int vif_vrf_table_set(struct vr_interface *, unsigned int,
         short, unsigned short);
-#if defined(__linux__)
+#if defined(__linux__) && defined(__KERNEL__)
 extern void vr_set_vif_ptr(struct net_device *dev, void *vif);
 #endif
 
