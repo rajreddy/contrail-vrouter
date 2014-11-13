@@ -797,20 +797,6 @@ lh_pkt_from_vm_tcp_mss_adj(struct vr_packet *pkt, unsigned short overlay_len)
 
     if (vr_ip_is_ip6(iph)) {
 
-        ip6h = (struct vr_ip6 *)iph;
-        pull_len += sizeof(struct vr_ip6);
-        proto = ip6h->ip6_nxt;
-        hlen = sizeof(struct vr_ip6);
-    } else {
-        /*
-         * If this is a fragment and not the first one, it can be ignored
-         */
-        if (iph->ip_frag_off & htons(IP_OFFSET)) {
-            goto out;
-        }
-
-    if (vr_ip_is_ip6(iph)) {
-
         pull_len += (sizeof(struct vr_ip6) - sizeof(struct vr_ip));
         if (!pskb_may_pull(skb, pull_len)) {
             return VP_DROP_PULL;

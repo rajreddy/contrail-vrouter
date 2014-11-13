@@ -1750,40 +1750,6 @@ vr_link_local_ports_init(struct vrouter *router)
     return 0;
 }
 
-
-void
-vr_link_local_ports_exit(struct vrouter *router)
-{
-    if (router->vr_link_local_ports) {
-        vr_free(router->vr_link_local_ports);
-        router->vr_link_local_ports = NULL;
-        router->vr_link_local_ports_size = 0;
-    }
-}
-
-int
-vr_link_local_ports_init(struct vrouter *router)
-{
-    unsigned int port_range, bytes;
-
-    if (router->vr_link_local_ports)
-        return 0;
-
-    /*  Udp and TCP inclusive of low and high limits*/
-    port_range = 2 * ((VR_DYNAMIC_PORT_END - VR_DYNAMIC_PORT_START) + 1);
-    /* Make it 16 bit boundary */
-    bytes = (port_range + 15) & ~15;
-    /* Bits to Bytes */
-    bytes /= 8;
-
-    router->vr_link_local_ports = vr_zalloc(bytes);
-    if (!router->vr_link_local_ports)
-        return -1;
-    router->vr_link_local_ports_size = bytes;
-
-    return 0;
-}
-
 /* flow module exit and init */
 void
 vr_flow_exit(struct vrouter *router, bool soft_reset)
