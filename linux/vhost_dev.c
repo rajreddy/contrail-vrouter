@@ -8,6 +8,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/netdevice.h>
+#include <linux/if_arp.h>
 #include <linux/inetdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/types.h>
@@ -228,10 +229,25 @@ vhost_if_add(struct vr_interface *vif)
         dev->features |= (NETIF_F_GSO | NETIF_F_TSO | NETIF_F_SG | NETIF_F_IP_CSUM);
 
         if (vif->vif_bridge) {
+            /*
+             * if there already was an association, need to remove that
+             */
+            if ((vp->vp_phys_dev) &&
+                    (vp->vp_phys_dev !=
+                     ((struct net_device *)vif->vif_bridge->vif_os))) {
+                vhost_del_tap_phys(vp->vp_phys_dev);
+            }
+
             vp->vp_phys_dev =
                 (struct net_device *)vif->vif_bridge->vif_os;
             strncpy(vp->vp_phys_name, vp->vp_phys_dev->name,
                     sizeof(vp->vp_phys_name));
+
+            if (vp->vp_phys_dev->type != ARPHRD_ETHER) {
+                dev->flags |= IFF_NOARP;
+            } else {
+                dev->flags &= ~IFF_NOARP;
+            }
 
             if (vp->vp_db_index >= 0)
                 return;
@@ -447,7 +463,7 @@ vhost_setup(struct net_device *dev)
     dev->netdev_ops = &vhost_dev_ops;
     dev->destructor = vhost_dev_destructor;
 #ifdef CONFIG_XEN
-    SET_ETHTOOL_OPS(dev, &vhost_ethtool_ops);
+    dev->ethtool_ops = &vhost_ethtool_ops;
     dev->features |= NETIF_F_GRO;
 #endif
 
@@ -476,8 +492,11 @@ vhost_dellink(struct net_device *dev, struct list_head *head)
 
     vp = netdev_priv(dev);
     if (vp) {
-        vhost_priv_db[vp->vp_db_index] = NULL;
+        if (vp->vp_db_index >= 0)
+            vhost_priv_db[vp->vp_db_index] = NULL;
+
         vp->vp_db_index = -1;
+
         if (vp->vp_phys_dev) {
             vhost_del_tap_phys(vp->vp_phys_dev);
             vp->vp_phys_dev = NULL;

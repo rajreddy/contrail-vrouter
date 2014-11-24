@@ -5,6 +5,7 @@
 import subprocess
 import sys
 import os
+import copy
 
 AddOption('--kernel-dir', dest = 'kernel-dir', action='store',
           help='Linux kernel source directory for vrouter.ko')
@@ -24,6 +25,16 @@ env.Append(CPPPATH = ['#tools/sandesh/library/c'])
 vr_root = './'
 makefile = vr_root + 'Makefile'
 dp_dir = Dir(vr_root).srcnode().abspath
+
+def MakeTestCmdFn(self, env, test_name, test_list, deps):
+    sources = copy.copy(deps)
+    sources.append(test_name + '.c')
+    tgt = env.UnitTest(target = test_name, source = sources)
+    env.Alias('vrouter:'+ test_name, tgt)
+    test_list.append(tgt)
+    return tgt
+
+VRouterEnv.AddMethod(MakeTestCmdFn, 'MakeTestCmd')
 
 def shellCommand(cmd):
     """ Return the output of a shell command
@@ -49,14 +60,14 @@ if sys.platform != 'darwin':
     env.Install(src_root, ['LICENSE', 'Makefile', 'GPL-2.0.txt'])
     env.Alias('install', src_root)
 
-    subdirs = ['linux', 'include', 'dp-core', 'host', 'sandesh', 'utils', 'uvrouter']
+    subdirs = ['linux', 'include', 'dp-core', 'host', 'sandesh', 'utils', 'uvrouter', 'test']
     for sdir in  subdirs:
         env.SConscript(sdir + '/SConscript',
                        exports='VRouterEnv',
                        variant_dir = env['TOP'] + '/vrouter/' + sdir,
                        duplicate = 0)
 
-    make_cmd = 'make'
+    make_cmd = 'cd ' + dp_dir + ' && make'
     if GetOption('kernel-dir'):
         make_cmd += ' KERNELDIR=' + GetOption('kernel-dir')
     make_cmd += ' SANDESH_HEADER_PATH=' + Dir(env['TOP'] + '/vrouter/').abspath
@@ -66,7 +77,7 @@ if sys.platform != 'darwin':
         BUILD_TARGETS.append('vrouter/uvrouter')
         BUILD_TARGETS.append('vrouter/utils')
 
-    kern = env.Command('vrouter.ko', None, make_cmd, chdir=dp_dir)
+    kern = env.Command('vrouter.ko', None, make_cmd)
     env.Default(kern)
     env.AlwaysBuild(kern)
 
@@ -89,7 +100,7 @@ if sys.platform != 'darwin':
                     env['TOP'] + '/tools/sandesh/library/c/' + src))
 
     if GetOption('clean') and (not COMMAND_LINE_TARGETS or 'vrouter' in COMMAND_LINE_TARGETS):
-        os.system('cd ' + dp_dir + ';' + make_cmd + ' clean')
+        os.system(make_cmd + ' clean')
 
     if GetOption('kernel-dir'):
         kern_version = shellCommand(
